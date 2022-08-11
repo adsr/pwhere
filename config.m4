@@ -6,5 +6,5 @@ PHP_ARG_ENABLE([pwhere],
 
 if test "$PHP_PWHERE" != "no"; then
   AC_DEFINE(HAVE_PWHERE, 1, [ Have pwhere support ])
-  PHP_NEW_EXTENSION(pwhere, pwhere.c, $ext_shared, , , , true)
+  PHP_NEW_EXTENSION(pwhere, pwhere.c, $ext_shared)
 fi
