@@ -13,7 +13,8 @@ static uint64_t pwhere_last_ns = 0;
 
 static void pwhere_execute_ex(zend_execute_data *execute_data) {
     zend_function *zf = execute_data->func;
-    char *fname = "<main>";
+
+    char *fname = pwhere_depth == 0 ? "<main>" : "<require>";
     if (zf->common.function_name) {
         fname = ZSTR_VAL(zf->common.function_name);
     }
@@ -30,9 +31,11 @@ static void pwhere_execute_ex(zend_execute_data *execute_data) {
         : NULL;
     if (prev_data) {
         zend_function *prev_zf = prev_data->func;
-        if (prev_zf->type == 2) {
-            fpath = ZSTR_VAL(prev_zf->op_array.filename);
-            lineno = prev_data->opline->lineno;
+        if (prev_zf) {
+            if (prev_zf->type == ZEND_USER_FUNCTION) {
+                fpath = ZSTR_VAL(prev_zf->op_array.filename);
+                lineno = prev_data->opline ? prev_data->opline->lineno : -1;
+            }
         }
     }
 
@@ -41,12 +44,13 @@ static void pwhere_execute_ex(zend_execute_data *execute_data) {
     uint64_t cur_ns = (uint64_t)ts.tv_sec * (uint64_t)1000000000 + (uint64_t)ts.tv_nsec;
 
     fprintf(stderr,
-        "%20.3f " "%04x " "%*s" "%s:%d " "%s%s%s\n",
+        "%20.3f " "%04x " "%*s" "%s:%d " "%s%s" "%s\n",
         (float)(pwhere_last_ns == 0 ? 0 : (cur_ns - pwhere_last_ns)) / 1000.f,
         pwhere_depth,
         pwhere_depth * 2, "",
         fpath, lineno,
-        clazz, *clazz != '\0' ? "::" : "", fname
+        clazz, *clazz != '\0' ? "::" : "",
+        fname
     );
 
     pwhere_last_ns = cur_ns;
