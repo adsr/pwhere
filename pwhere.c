@@ -69,7 +69,7 @@ static void pwhere_enable() {
 }
 
 static void pwhere_disable() {
-    if (zend_execute_ex == pwhere_execute_ex {
+    if (zend_execute_ex == pwhere_execute_ex) {
         zend_execute_ex = orig_execute_ex;
     }
 }
