@@ -5,6 +5,7 @@
 #include "php.h"
 #include "ext/standard/info.h"
 #include "php_pwhere.h"
+#include "pwhere_arginfo.h"
 
 static void (*orig_execute_ex)(zend_execute_data *execute_data) = NULL;
 
@@ -44,7 +45,7 @@ static void pwhere_execute_ex(zend_execute_data *execute_data) {
     uint64_t cur_ns = (uint64_t)ts.tv_sec * (uint64_t)1000000000 + (uint64_t)ts.tv_nsec;
 
     fprintf(stderr,
-        "%20.3f " "%04x " "%*s" "%s:%d " "%s%s" "%s\n",
+        "%20.3f " "% 4d " "%*s" "%s:%d " "%s%s" "%s\n",
         (float)(pwhere_last_ns == 0 ? 0 : (cur_ns - pwhere_last_ns)) / 1000.f,
         pwhere_depth,
         pwhere_depth * 2, "",
@@ -60,19 +61,45 @@ static void pwhere_execute_ex(zend_execute_data *execute_data) {
     --pwhere_depth;
 }
 
+static void pwhere_enable() {
+    if (zend_execute_ex != pwhere_execute_ex) {
+        orig_execute_ex = execute_ex;
+        zend_execute_ex = pwhere_execute_ex;
+    }
+}
+
+static void pwhere_disable() {
+    if (zend_execute_ex == pwhere_execute_ex {
+        zend_execute_ex = orig_execute_ex;
+    }
+}
+
 PHP_MINIT_FUNCTION(pwhere) {
-    orig_execute_ex = execute_ex;
-    zend_execute_ex = pwhere_execute_ex;
+    pwhere_enable();
 }
 
 PHP_MSHUTDOWN_FUNCTION(pwhere) {
-    zend_execute_ex = orig_execute_ex;
+    pwhere_disable();
 }
 
 PHP_MINFO_FUNCTION(pwhere) {
     php_info_print_table_start();
     php_info_print_table_header(2, "pwhere support", "enabled");
     php_info_print_table_end();
+}
+
+PHP_FUNCTION(pwhere_enable) {
+    bool on_off = 0;
+
+    ZEND_PARSE_PARAMETERS_START(1, 1)
+        Z_PARAM_BOOL(on_off)
+    ZEND_PARSE_PARAMETERS_END();
+
+    if (on_off) {
+        pwhere_enable();
+    } else {
+        pwhere_disable();
+    }
 }
 
 zend_module_entry pwhere_module_entry = {
