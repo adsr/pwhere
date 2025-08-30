@@ -93,4 +93,6 @@ in f with n==3
               43.960    2     /home/adam/pxtrace/test2.php:5    C::s
 ```
 
+### Screencap of `ansi_color` mode
+
 ![ansi_color mode](./color.gif)
