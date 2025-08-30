@@ -1,8 +1,8 @@
 --TEST--
-pxtrace test
+pxtrace test basic
 --INI--
-pxtrace.output_path=@stdout
 pxtrace.auto_enable=1
+pxtrace.output_path=@stdout
 --EXTENSIONS--
 pxtrace
 --FILE--
@@ -31,13 +31,13 @@ echo "END\n";
 ?>
 --EXPECTF--
 BEGIN
-%w%f%w0 <internal>:-1 <main>
+%w%f%w 0 <internal>:-1   <main>
 f1
-%w%f%w1   %s:%d f1
+%w%f%w 1   %a:%d%w f1
 m1
-%w%f%w2     %s:%d C::m1
+%w%f%w 2     %a:%d%w C::m1
 m2
-%w%f%w3       %s:%d C::m2
+%w%f%w 3       %a:%d%w C::m2
 m3
-%w%f%w4         %s:%d C::m3
+%w%f%w 4         %a:%d%w C::m3
 END

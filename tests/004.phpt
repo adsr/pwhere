@@ -1,8 +1,9 @@
 --TEST--
-pxtrace test output_path
+pxtrace test trace_statements
 --INI--
 pxtrace.auto_enable=1
 pxtrace.output_path=@stdout
+pxtrace.trace_statements=1
 --EXTENSIONS--
 pxtrace
 --FILE--
@@ -10,7 +11,6 @@ pxtrace
 class C {
     public function m1() {
         echo __FUNCTION__ . PHP_EOL;
-        ini_set('pxtrace.output_path', __FILE__ . '.tmp');
         $this->m2();
     }
     private function m2() {
@@ -29,23 +29,27 @@ function f1() {
 echo "BEGIN\n";
 f1();
 echo "END\n";
-
-echo "TMP\n";
-pxtrace_set_enabled(false); // needed to flush output to tmp file
-echo file_get_contents(__FILE__ . '.tmp');
 ?>
---CLEAN--
-<?php @unlink(__FILE__ . '.tmp'); ?>
 --EXPECTF--
 BEGIN
 %w%f%w 0 <internal>:-1   <main>
+    %w 1   %a:%d%w echo "BEGIN\n";
 f1
+    %w 1   %a:%d%w f1();
 %w%f%w 1   %a:%d%w f1
+    %w 2     %a:%d%w echo __FUNCTION__ . PHP_EOL;
 m1
+    %w 2     %a:%d%w $c = new C();
+    %w 2     %a:%d%w $c->m1();
 %w%f%w 2     %a:%d%w C::m1
+    %w 3       %a:%d%w echo __FUNCTION__ . PHP_EOL;
 m2
-m3
-END
-TMP
+    %w 3       %a:%d%w $this->m2();
 %w%f%w 3       %a:%d%w C::m2
+    %w 4         %a:%d%w echo __FUNCTION__ . PHP_EOL;
+m3
+    %w 4         %a:%d%w self::m3();
 %w%f%w 4         %a:%d%w C::m3
+    %w 5           %a:%d%w echo __FUNCTION__ . PHP_EOL;
+END
+    %w 1   %a:%d%w echo "END\n";

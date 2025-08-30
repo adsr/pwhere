@@ -1,8 +1,8 @@
 --TEST--
 pxtrace test pxtrace_set_enabled
 --INI--
-pxtrace.output_path=@stdout
 pxtrace.auto_enable=0
+pxtrace.output_path=@stdout
 --EXTENSIONS--
 pxtrace
 --FILE--
@@ -36,6 +36,6 @@ BEGIN
 f1
 m1
 m2
-%w%f%w3       %s:%d C::m2
+%w%f%w 3       %a:%d%w C::m2
 m3
 END

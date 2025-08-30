@@ -6,5 +6,5 @@ PHP_ARG_ENABLE([pxtrace],
 
 if test "$PHP_PXTRACE" != "no"; then
   AC_DEFINE(HAVE_PXTRACE, 1, [ Have pxtrace support ])
-  PHP_NEW_EXTENSION(pxtrace, pxtrace.c, $ext_shared)
+  PHP_NEW_EXTENSION(pxtrace, pxtrace.c, $ext_shared, , , , yes)
 fi
