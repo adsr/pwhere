@@ -1,0 +1,22 @@
+diff --git a/pxtrace.c b/pxtrace.c
+index e94bd43..9a29f53 100644
+--- a/pxtrace.c
++++ b/pxtrace.c
+@@ -127,8 +127,17 @@ static void pxtrace_execute_ex(zend_execute_data *frame) {
+     zend_function *zf = frame->func;
+ 
+     char *fname = PXTRACE_G(depth) == 0 ? "<main>" : "<require>";
++    char fname_adj[1024];
+     if (zf->common.function_name) {
+         fname = ZSTR_VAL(zf->common.function_name);
++        if (strstr(fname, "{closure}")) {
++            snprintf(fname_adj, sizeof(fname_adj), "%s:%s:%d",
++                fname,
++                zf->op_array.filename,
++                zf->op_array.line_start
++            );
++            fname = fname_adj;
++        }
+     }
+ 
+     char *class_name = "";
