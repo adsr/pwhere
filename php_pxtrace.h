@@ -11,14 +11,19 @@ extern zend_module_entry pxtrace_module_entry;
 #define PXTRACE_COPYRIGHT "Copyright (c) 2025"
 
 ZEND_BEGIN_MODULE_GLOBALS(pxtrace)
-    int enabled;
+    // ini
     char *output_path;
-    FILE *output_file;
-    int output_fopened;
     int auto_enable;
     int trace_statements;
     int ansi_color;
+    int max_depth;
+    int indent;
+    // state
+    int enabled;
     void (*orig_execute_ex)(zend_execute_data *execute_data);
+    FILE *output_file;
+    int output_fopened;
+    int output_sapi;
     int depth;
     uint64_t last_ns;
 ZEND_END_MODULE_GLOBALS(pxtrace)

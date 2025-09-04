@@ -1,20 +1,21 @@
 --TEST--
-pxtrace test output_path
+pxtrace test pxtrace_set_enabled
 --INI--
-pxtrace.auto_enable=1
-pxtrace.output_path=@stdout
+pxtrace.auto_enable=0
+pxtrace.output_path=@sapi
 --EXTENSIONS--
 pxtrace
 --FILE--
 <?php
 class C {
     public function m1() {
+        pxtrace_set_enabled(true);
         echo __FUNCTION__ . PHP_EOL;
-        ini_set('pxtrace.output_path', __FILE__ . '.tmp');
         $this->m2();
     }
     private function m2() {
         echo __FUNCTION__ . PHP_EOL;
+        pxtrace_set_enabled(false);
         self::m3();
     }
     private static function m3() {
@@ -29,23 +30,12 @@ function f1() {
 echo "BEGIN\n";
 f1();
 echo "END\n";
-
-echo "TMP\n";
-pxtrace_set_enabled(false); // needed to flush output to tmp file
-echo file_get_contents(__FILE__ . '.tmp');
 ?>
---CLEAN--
-<?php @unlink(__FILE__ . '.tmp'); ?>
 --EXPECTF--
 BEGIN
-%w%f%w 0 <internal>:-1   <main>
 f1
-%w%f%w 1   %a:%d%w f1
 m1
-%w%f%w 2     %a:%d%w C::m1
+%w%f%w 3       %a:%d%w C::m2
 m2
 m3
 END
-TMP
-%w%f%w 3       %a:%d%w C::m2
-%w%f%w 4         %a:%d%w C::m3

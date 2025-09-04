@@ -1,21 +1,19 @@
 --TEST--
-pxtrace test pxtrace_set_enabled
+pxtrace test basic
 --INI--
-pxtrace.auto_enable=0
-pxtrace.output_path=@stdout
+pxtrace.auto_enable=1
+pxtrace.output_path=@sapi
 --EXTENSIONS--
 pxtrace
 --FILE--
 <?php
 class C {
     public function m1() {
-        pxtrace_set_enabled(true);
         echo __FUNCTION__ . PHP_EOL;
         $this->m2();
     }
     private function m2() {
         echo __FUNCTION__ . PHP_EOL;
-        pxtrace_set_enabled(false);
         self::m3();
     }
     private static function m3() {
@@ -32,10 +30,14 @@ f1();
 echo "END\n";
 ?>
 --EXPECTF--
+%w%f%w 0 <internal>:-1   <main>
 BEGIN
+%w%f%w 1   %a:%d%w f1
 f1
+%w%f%w 2     %a:%d%w C::m1
 m1
-m2
 %w%f%w 3       %a:%d%w C::m2
+m2
+%w%f%w 4         %a:%d%w C::m3
 m3
 END

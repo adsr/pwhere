@@ -19,6 +19,7 @@ static void pxtrace_execute_ex(zend_execute_data *frame);
 ZEND_DLEXPORT void pxtrace_statement_handler(zend_execute_data *frame);
 static int pxtrace_read_line(char *fpath, int lineno, char *line, size_t nline);
 static int pxtrace_open_output(void);
+static void pxtrace_printf(char *fmt, ...);
 static int pxtrace_get_current_stack_depth(void);
 static void pxtrace_enable(void);
 static void pxtrace_disable(void);
@@ -75,6 +76,8 @@ PHP_INI_BEGIN()
     STD_PHP_INI_ENTRY("pxtrace.auto_enable",      "0",       PHP_INI_ALL, OnUpdateLong, auto_enable, zend_pxtrace_globals, pxtrace_globals)
     STD_PHP_INI_ENTRY("pxtrace.trace_statements", "0",       PHP_INI_ALL, OnUpdateLong, trace_statements, zend_pxtrace_globals, pxtrace_globals)
     STD_PHP_INI_ENTRY("pxtrace.ansi_color",       "0",       PHP_INI_ALL, OnUpdateLong, ansi_color, zend_pxtrace_globals, pxtrace_globals)
+    STD_PHP_INI_ENTRY("pxtrace.max_depth",        "0",       PHP_INI_ALL, OnUpdateLong, max_depth, zend_pxtrace_globals, pxtrace_globals)
+    STD_PHP_INI_ENTRY("pxtrace.indent",           "2",       PHP_INI_ALL, OnUpdateLong, indent, zend_pxtrace_globals, pxtrace_globals)
 PHP_INI_END()
 
 enum PXTRACE_COLOR {
@@ -91,6 +94,7 @@ static PHP_MINFO_FUNCTION(pxtrace) {
     php_info_print_table_header(2, "pxtrace support", "enabled");
     php_info_print_table_header(2, "extension version", PXTRACE_VERSION);
     php_info_print_table_end();
+    DISPLAY_INI_ENTRIES();
 }
 
 static PHP_MINIT_FUNCTION(pxtrace) {
@@ -116,6 +120,7 @@ static PHP_RINIT_FUNCTION(pxtrace) {
 static PHP_INI_MH(pxtrace_on_update_output_path) {
     pxtrace_close_file();
     PXTRACE_G(output_path) = ZSTR_VAL(new_value);
+    PXTRACE_G(output_sapi) = 0;
     return SUCCESS;
 }
 
@@ -124,6 +129,10 @@ static int pxtrace_extension_startup(zend_extension *ext) {
 }
 
 static void pxtrace_execute_ex(zend_execute_data *frame) {
+    if (PXTRACE_G(max_depth) > 0 && PXTRACE_G(depth) > PXTRACE_G(max_depth)) {
+        goto pxtrace_execute_ex_call;
+    }
+
     zend_function *zf = frame->func;
 
     char *fname = PXTRACE_G(depth) == 0 ? "<main>" : "<require>";
@@ -151,14 +160,7 @@ static void pxtrace_execute_ex(zend_execute_data *frame) {
     clock_gettime(CLOCK_MONOTONIC, &ts);
     uint64_t cur_ns = (uint64_t)ts.tv_sec * (uint64_t)1000000000 + (uint64_t)ts.tv_nsec;
 
-    if (!PXTRACE_G(output_file)) {
-        if (!pxtrace_open_output()) {
-            pxtrace_disable();
-            return;
-        }
-    }
-
-    fprintf(PXTRACE_G(output_file),
+    pxtrace_printf(
         "%s%20.3f%s "
         "%s% 4d%s "
         "%*s"
@@ -166,13 +168,14 @@ static void pxtrace_execute_ex(zend_execute_data *frame) {
         "%s%s%s%s%s\n",
         pxtrace_color(PXTRACE_COLOR_TIME), (float)(PXTRACE_G(last_ns) == 0 ? 0 : (cur_ns - PXTRACE_G(last_ns))) / 1000.f, pxtrace_color(PXTRACE_COLOR_RESET),
         pxtrace_color(PXTRACE_COLOR_DEPTH), PXTRACE_G(depth), pxtrace_color(PXTRACE_COLOR_RESET),
-        (PXTRACE_G(depth) < 0 ? 0 : PXTRACE_G(depth)) * 2, "",
+        (PXTRACE_G(depth) < 0 ? 0 : PXTRACE_G(depth)) * (MAX(0, PXTRACE_G(indent))), "",
         pxtrace_color(PXTRACE_COLOR_PATH), fpath, lineno, pxtrace_color(PXTRACE_COLOR_RESET),
         pxtrace_color(PXTRACE_COLOR_FUNC), class_name, *class_name != '\0' ? "::" : "", fname, pxtrace_color(PXTRACE_COLOR_RESET)
     );
 
     PXTRACE_G(last_ns) = cur_ns;
 
+pxtrace_execute_ex_call:
     PXTRACE_G(depth) += 1;
     (PXTRACE_G(orig_execute_ex))(frame);
     PXTRACE_G(depth) -= 1;
@@ -217,14 +220,7 @@ ZEND_DLEXPORT void pxtrace_statement_handler(zend_execute_data *frame) {
         }
     }
 
-    if (!PXTRACE_G(output_file)) {
-        if (!pxtrace_open_output()) {
-            pxtrace_disable();
-            return;
-        }
-    }
-
-    fprintf(PXTRACE_G(output_file),
+    pxtrace_printf(
         "%20s "
         "%s% 4d%s "
         "%*s"
@@ -232,7 +228,7 @@ ZEND_DLEXPORT void pxtrace_statement_handler(zend_execute_data *frame) {
         "%s%.*s%s\n",
         " ",
         pxtrace_color(PXTRACE_COLOR_DEPTH), PXTRACE_G(depth), pxtrace_color(PXTRACE_COLOR_RESET),
-        (PXTRACE_G(depth) < 0 ? 0 : PXTRACE_G(depth)) * 2, "",
+        (PXTRACE_G(depth) < 0 ? 0 : PXTRACE_G(depth)) * (MAX(0, PXTRACE_G(indent))), "",
         pxtrace_color(PXTRACE_COLOR_PATH), fpath, lineno, pxtrace_color(PXTRACE_COLOR_RESET),
         pxtrace_color(PXTRACE_COLOR_CODE), linelen > 0 ? linelen - 1 : 1, linelen > 0 ? linep : "-", pxtrace_color(PXTRACE_COLOR_RESET)
     );
@@ -264,6 +260,9 @@ static int pxtrace_open_output(void) {
         PXTRACE_G(output_file) = stderr;
     } else if (strcmp(PXTRACE_G(output_path), "@stdout") == 0) {
         PXTRACE_G(output_file) = stdout;
+    } else if (strcmp(PXTRACE_G(output_path), "@sapi") == 0) {
+        PXTRACE_G(output_file) = (void *)1;
+        PXTRACE_G(output_sapi) = 1;
     } else {
         PXTRACE_G(output_file) = fopen(PXTRACE_G(output_path), "w");
         if (!PXTRACE_G(output_file)) {
@@ -273,6 +272,26 @@ static int pxtrace_open_output(void) {
         PXTRACE_G(output_fopened) = 1;
     }
     return 1;
+}
+
+static void pxtrace_printf(char *fmt, ...) {
+    va_list vl;
+    char buf[4096];
+    int buflen;
+    va_start(vl, fmt);
+    if (!PXTRACE_G(output_file)) {
+        if (!pxtrace_open_output()) {
+            pxtrace_disable();
+            return;
+        }
+    }
+    if (PXTRACE_G(output_sapi)) {
+        buflen = vsnprintf(buf, sizeof(buf), fmt, vl);
+        php_output_write(buf, buflen);
+    } else {
+        vfprintf(PXTRACE_G(output_file), fmt, vl);
+    }
+    va_end(vl);
 }
 
 static int pxtrace_get_current_stack_depth(void) {
